@@ -1,7 +1,7 @@
 import { Image, StyleSheet, Platform, View, Text, TextInput, TouchableOpacity, Animated, Easing, ScrollView, ActivityIndicator, Dimensions, Alert, Button } from 'react-native';
 
 
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useEffect, useRef, useState } from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Fontisto from 'react-native-vector-icons/AntDesign';
@@ -1350,12 +1350,24 @@ const handleBookButtonPress = () => {
     <View style={styles.container}>
     {/* Map Background */}
     <MapView
-      style={StyleSheet.absoluteFillObject}
-      region={mapRegion}
-      onRegionChangeComplete={(region) => setMapRegion(region)}
-    >
-      <Marker coordinate={{ latitude: mapRegion.latitude, longitude: mapRegion.longitude }} />
-    </MapView>
+  provider="google"
+  style={StyleSheet.absoluteFillObject}
+  initialRegion={{
+    latitude: 25.3000,
+    longitude: 83.0000,
+    latitudeDelta: 0.02,
+    longitudeDelta: 0.02,
+  }}
+>
+  <Marker
+    coordinate={{
+      latitude: 25.3000,
+      longitude: 83.0000,
+    }}
+  />
+</MapView>
+
+
     {(loading ||mloading) && (
         <View style={styles.loadingOverlay}>
           <Icon name="boat" size={50} color="black" />

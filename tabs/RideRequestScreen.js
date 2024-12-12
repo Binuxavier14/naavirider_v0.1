@@ -171,7 +171,7 @@ console.log('tripDetails',tripDetails)
                 setTimeout(() => {
                   setShowDriverNotFound(false); // Close the modal after 2 seconds
                   onClose();
-                }, 2000);
+                }, 4000);
                 // refetch({ input: { userType: 'driver', driverphonenumber: message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber } });
                 // tripRefetch({ input: { PK: message?.payload?.data?.updatedPaymentCaptured?.PK, SK: message?.payload?.data?.updatedPaymentCaptured?.SK } });
 
@@ -294,10 +294,13 @@ console.log('tripDetails',tripDetails)
 
 const styles = StyleSheet.create({
   container: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flex: 1,
     justifyContent: "flex-end",
     alignItems: "bottom",
     zIndex: 1,
+
   },
   requestCard: {
     backgroundColor: "#f9f9f9",

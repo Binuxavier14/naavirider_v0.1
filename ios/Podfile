@@ -14,8 +14,12 @@ if linkage != nil
   use_frameworks! :linkage => linkage.to_sym
 end
 
-target 'naaviRiderApp' do
+
   config = use_native_modules!
+
+  target 'naaviRiderApp' do
+    rn_maps_path = '../node_modules/react-native-maps'
+  pod 'react-native-google-maps', :path => rn_maps_path
 
   use_react_native!(
     :path => config[:reactNativePath],

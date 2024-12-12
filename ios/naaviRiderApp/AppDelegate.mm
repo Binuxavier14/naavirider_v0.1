@@ -1,6 +1,6 @@
 #import "AppDelegate.h"
-
 #import <React/RCTBundleURLProvider.h>
+#import <GoogleMaps/GoogleMaps.h> // Import Google Maps SDK
 
 @implementation AppDelegate
 
@@ -10,6 +10,9 @@
   // You can add your custom initial props in the dictionary below.
   // They will be passed down to the ViewController used by React Native.
   self.initialProps = @{};
+
+  // Provide Google Maps API Key
+  [GMSServices provideAPIKey:@"AIzaSyDf7HV1Y3FzBhoczwQwSb4pgyontwhd1nQ"];
 
   return [super application:application didFinishLaunchingWithOptions:launchOptions];
 }
