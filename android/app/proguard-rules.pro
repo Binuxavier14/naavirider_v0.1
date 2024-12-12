@@ -8,3 +8,17 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+# Keep React Native vector icons
+-keep class com.facebook.react.views.text.** { *; }
+-keep class com.facebook.react.modules.i18nmanager.I18nUtil { *; }
+
+# Keep vector icons fonts from react-native-vector-icons
+-keep class com.oblador.vectoricons.** { *; }
+-dontwarn com.oblador.vectoricons.**
+
+# If you use react-native-fresco (image loading library), you might also need this
+-keep class com.facebook.react.modules.fresco.** { *; }
+
+# Ensure that ProGuard doesn’t strip other React Native dependencies
+-keep class com.facebook.react.** { *; }
+-dontwarn com.facebook.react.**

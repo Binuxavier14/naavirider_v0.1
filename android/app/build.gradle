@@ -84,6 +84,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+                manifestPlaceholders = [auth0Domain: "dev-0d2vacav84pvzvyr.us.auth0.com", auth0Scheme: "${applicationId}.auth0"]
+
     }
     signingConfigs {
         debug {
@@ -117,3 +119,4 @@ dependencies {
         implementation jscFlavor
     }
 }
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
