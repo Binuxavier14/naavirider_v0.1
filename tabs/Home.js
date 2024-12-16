@@ -159,11 +159,11 @@ export default function Home({route, navigation }) {
     longitudeDelta: 0.02,
   });
 
-  const cardHeight = useRef(new Animated.Value(500)).current;
+  const cardHeight = useRef(new Animated.Value(380)).current;
 
   const toggleCard = () => {
     Animated.timing(cardHeight, {
-      toValue: isExpanded ? 400 : 650,
+      toValue: isExpanded ? 380 : 650,
       duration: 300,
       easing: Easing.ease,
       useNativeDriver: false,
@@ -1346,6 +1346,18 @@ const handleBookButtonPress = () => {
     }
   };
 
+  const boatLocations = [
+    { id: 1, latitude: 25.3172500, longitude: 83.0243951 }, // Varanasi
+    { id: 2, latitude: 25.3175852, longitude: 83.0246120 }, // Nearby spot 1
+    { id: 3, latitude: 25.3172121, longitude: 83.0258837 }, // Nearby spot 2
+    { id: 4, latitude: 25.3193918, longitude: 83.0266254 }, // Nearby spot 3
+    { id: 5, latitude: 25.3175349, longitude: 83.0269958 }, // Varanasi
+    { id: 6, latitude: 25.3201546, longitude: 83.0267088 }, // Nearby spot 1
+    { id: 7, latitude: 25.3179901, longitude: 83.0236863 }, // Nearby spot 2
+    { id: 8, latitude: 25.3189905, longitude: 83.0248377 }, // Nearby spot 3
+    { id: 8, latitude: 25.3187559, longitude: 83.0256279 }, // Nearby spot 3
+  ];
+
   return (
     <View style={styles.container}>
     {/* Map Background */}
@@ -1353,18 +1365,27 @@ const handleBookButtonPress = () => {
   provider="google"
   style={StyleSheet.absoluteFillObject}
   initialRegion={{
-    latitude: 25.3000,
-    longitude: 83.0000,
-    latitudeDelta: 0.02,
-    longitudeDelta: 0.02,
+    latitude: 25.3172500, // Center on Varanasi Ganges River
+    longitude: 83.0243951,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+
   }}
 >
+{boatLocations.map((boat) => (
   <Marker
     coordinate={{
-      latitude: 25.3000,
-      longitude: 83.0000,
+      latitude: boat.latitude,
+              longitude: boat.longitude,
     }}
-  />
+  >
+     <Image
+              source={require('../assets/images/boat.png')} // Replace with your boat image path
+              style={{ width: 80, height: 80 }} // Adjust the size of the boat icon
+              resizeMode="contain"
+            />
+  </Marker>
+   ))}
 </MapView>
 
 
