@@ -13,6 +13,7 @@ import RazorpayCheckout from 'react-native-razorpay';
 import { Dropdown } from 'react-native-element-dropdown';
 import RideRequestScreen from './RideRequestScreen';
 import notifee, { AndroidImportance ,EventType} from '@notifee/react-native';
+import messaging from '@react-native-firebase/messaging';
 
 const generateTimeSlots = (startTime, endTime) => {
   const timeSlots = [];
@@ -1307,23 +1308,22 @@ const handleBookButtonPress = () => {
   // const filteredBoats = getFilteredBoats(numberOfPeople);
 
   useEffect(() => {
-    // Listen for foreground notification taps
-    const unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
-      if (type === EventType.PRESS && detail.pressAction?.id === 'home') {
-        navigation.navigate('Home');
-      }
+    // Foreground Notification Handler
+    const unsubscribe = messaging().onMessage(async (remoteMessage) => {
+      console.log('Foreground message:', remoteMessage);
+
+      await notifee.displayNotification({
+        title: remoteMessage.notification?.title || 'New Notification',
+        body: remoteMessage.notification?.body || 'You have a new message.',
+        android: {
+          channelId: 'default',
+          pressAction: { id: 'default' },
+        },
+      });
     });
 
-    // Handle background notification taps
-    notifee.onBackgroundEvent(async ({ type, detail }) => {
-      if (type === EventType.PRESS && detail.pressAction?.id === 'home') {
-        navigation.navigate('Home');
-      }
-    });
-
-    return () => unsubscribe(); // Clean up
+    return unsubscribe; // Cleanup listener
   }, []);
-
 
   const sendPaymentNotification = async () => {
     try {

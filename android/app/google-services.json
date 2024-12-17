@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "8906994299",
+    "project_id": "naavirider",
+    "storage_bucket": "naavirider.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:8906994299:android:de079731087d3aa5c628de",
+        "android_client_info": {
+          "package_name": "com.naaviriderapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD9Oo_2yvAgEiTqjCZmbehPk6xAGmqc7AY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
