@@ -62,6 +62,8 @@ tripsk
 tripamountinfo
 zonename
 driverphonenumber
+invoicefilekey
+paymentType
     }
   }
 `;
@@ -135,6 +137,15 @@ export const riderRequestTrip = gql`
     }
   }
 `;
+export const refundPaidTrip = gql`
+  mutation refundPaidTrip($input: tripinput!) {
+    refundPaidTrip(input: $input) {
+      responsestatus
+     
+    }
+  }
+`;
+
 export const  cancelRiderRequestedTrip = gql`
   mutation cancelRiderRequestedTrip($input: tripinput!) {
     cancelRiderRequestedTrip(input: $input) {
@@ -186,6 +197,14 @@ export const getBoatTypePrice = gql`
      triptype_full_partial_gst
      triptype_half_partial_gst
      triptype_cross_partial_gst
+    }
+  }
+`;
+
+export const getSignedURL = gql`
+  query getSignedURL($input: s3input!) {
+    getSignedURL(input: $input) {
+      url
     }
   }
 `;

@@ -17,8 +17,8 @@
 // }
 
 // export default Onboarding;
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, ScrollView, Platform, ActivityIndicator, Image } from 'react-native';
 // import { useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@apollo/client';
 import {addUser, getUserInfo} from '../query/query'
@@ -26,6 +26,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Form validation schema using Yup
 const validationSchema = Yup.object().shape({
@@ -38,12 +39,32 @@ export default function Onboarding() {
 //   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation();
+  const [fcmToken, setFcmToken] = useState(null); // State to store the FCM token
+
+  useEffect(() => {
+    const fetchFCMToken = async () => {
+      try {
+        // Retrieve the FCM token from AsyncStorage
+        const token = await AsyncStorage.getItem('FCMToken');
+        if (!token) {
+          console.error('FCM token not found');
+          return;
+        }
+        setFcmToken(token); // Set the token in state
+      } catch (error) {
+        console.error('Error fetching FCM token:', error);
+      }
+    };
+
+    fetchFCMToken();
+  }, []);
 
   const { data, loading: apiLoading, refetch } = useQuery(getUserInfo, {
     fetchPolicy: "network-only",
-    variables: { input: {userType :'rider'} },
+    skip: !fcmToken, // Skip the query until the FCM token is available
+    variables: { input: {userType :'rider', notitoken: fcmToken,initialload: true} },
     onCompleted: (fetchedData) => {
-     console.log('data',data)
+     //console.log('data',data)
       setLoading(false); 
       if (fetchedData && fetchedData?.getUserInfo && fetchedData?.getUserInfo?.length > 0) {
         navigation.replace('TabsNavigator');      }
@@ -64,7 +85,7 @@ if(response?.addUser?.responsestatus) {
     navigation.replace('TabsNavigator');   };
 
   const handleSubmit = (values) => {
-        console.log('Form values:', values);
+        //console.log('Form values:', values);
 
     addUserFunction({
         variables: {
@@ -78,10 +99,12 @@ if(response?.addUser?.responsestatus) {
       });
     // router.replace('/(tabs)'); 
   };
-  console.log('datasss',data)
+  //console.log('datasss',data)
 
   if (loading || apiLoading) {    return (
       <View style={styles.loadingContainer}>
+                  <Image source={require('../assets/images/two.png')} style={styles.logo} />
+
         <Ionicons name="boat" size={50} color="black" />
         <ActivityIndicator size="large" color="black" style={{ marginTop: 20 }} />
       </View>
@@ -141,9 +164,9 @@ if(response?.addUser?.responsestatus) {
 
               <View style={styles.bottomContent}>
                 {/* <TouchableOpacity onPress={() => router.replace('/(tabs)')}> */}
-                <TouchableOpacity onPress={() =>  navigation.replace('TabsNavigator')} >
+                {/* <TouchableOpacity onPress={() =>  navigation.replace('TabsNavigator')} >
                   <Text style={styles.skipText}>Skip for now</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
 
                 <TouchableOpacity style={styles.button} onPress={handleSubmit}>
                   <Text style={styles.buttonText}>Let’s get started</Text>
@@ -199,6 +222,8 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 20,
     fontSize: 16,
+color: '#333333',
+
   },
   inputError: { borderColor: 'red' },
   errorText: { color: 'red', fontSize: 12, marginBottom: 10 },
@@ -223,6 +248,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#e54d3a',
   },
+  logo: { width: 150, height: 150 },
+
 });

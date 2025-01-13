@@ -1,5 +1,5 @@
 import { useMutation } from "@apollo/client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -7,18 +7,49 @@ import {
   TouchableOpacity,
   Image,
   Modal,
+  Alert,
 } from "react-native";
 import { cancelRiderRequestedTrip } from "../query/query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ProgressBar } from 'react-native-paper';
 
-const RideRequestScreen = ({ tripDetails, onClose ,tripRefetchdetails}) => {
+const RideRequestScreen = ({ tripDetails, onClose ,tripRefetchdetails,data,onNotFoundshow}) => {
   const [timeLeft, setTimeLeft] = useState(180); // Default to 180 seconds
   const [cancelEnabled, setCancelEnabled] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showDriverNotFound, setShowDriverNotFound] = useState(false); // For "Driver Not Found" logic
   const [ws, setWs] = useState(null);
 
-console.log('tripDetails',tripDetails)
+  const [progress, setProgress] = useState(0);
+  const [createdOn, setCreatedOn] = useState(tripDetails?.createdOn); // Get the createdOn time from tripDetails
+  const [currentTime, setCurrentTime] = useState(Date.now()); // Get the current time
+
+  const statusMessages = [
+    "We are looking for the best rides for you.",
+    "Searching for available drivers nearby.",
+    "Almost there! Hang tight as we find your boat.",
+    "Matching you with the most reliable driver.",
+    "Just a moment longer! Finalizing your booking.",
+    "Your perfect ride is just around the corner.",
+    "Scanning the waters for the best boat options.",
+    "Ensuring a smooth journey—stay with us!",
+    "Finding the quickest route for your ride.",
+    "Optimizing your ride experience for safety and comfort.",
+    "Hold tight! We're confirming driver availability.",
+    "Connecting you to a highly-rated captain.",
+    "Navigating through the options for your best match.",
+    "Your adventure is about to begin! One moment please.",
+    "Aligning the stars to find your perfect boat match.",
+    "Preparing your journey with care and precision.",
+    "Ensuring the best fit for your travel needs.",
+    "Loading the best options for your ride.",
+    "Anchors away! Matching you with the ideal boat.",
+    "Almost done! Your ride is being secured."
+  ];
+  
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+
+
   const [requestRide, { loading }] = useMutation(cancelRiderRequestedTrip, {
     onCompleted: (response) => {
       if (response.cancelRiderRequestedTrip.responsestatus) {
@@ -38,24 +69,21 @@ console.log('tripDetails',tripDetails)
       },
     });
   };
+ useEffect(() => {
+    const messageInterval = setInterval(() => {
+      setCurrentMessageIndex((prevIndex) => (prevIndex + 1) % statusMessages.length);
+    }, 10000); // Change message every 5 seconds
 
-  // useEffect(() => {
-  //   if (tripDetails?.createdOn) {
-  //     const createdTimeIST = Math.floor(tripDetails.createdOn / 1000);
-  //     const createdTimeGMT = createdTimeIST - 19800; // Convert IST to GMT
-  //     const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
-  //     const elapsedTime = currentTime - createdTimeGMT;
-  //     const remainingTime = Math.max(180 - elapsedTime, 0); // Prevent negative time
-  //     setTimeLeft(remainingTime);
-  //     // setCancelEnabled(remainingTime <= 0);
-  //   }
-  // }, [tripDetails]);
+    return () => clearInterval(messageInterval); // Cleanup interval
+  }, []);
 
   useEffect(() => {
     if (timeLeft > 0) {
       const timer = setInterval(() => {
+        setCurrentTime(Date.now()); // Update the current time
         setTimeLeft((prev) => prev - 1);
-      }, 1000);
+        setProgress((prev) => (prev + 0.008) % 1); // Update progress with a wave effect (0.005 can be adjusted for wave speed)
+      }, 20); // Adjust interval for smoother animation (lower value for smoother)
 
       return () => clearInterval(timer); // Cleanup interval
     } else {
@@ -63,22 +91,20 @@ console.log('tripDetails',tripDetails)
       setTimeout(() => {
         onClose();
       }, 2000);
-      
-
     }
-  }, [timeLeft]);
+  }, [timeLeft, currentTime]); // Add currentTime to the dependency array
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  };
+  useEffect(() => {
+    if (createdOn) {
+      const timeDifference = currentTime - createdOn; // Calculate the time difference
+      if (timeDifference < 180000) { // If the time difference is less than 3 minutes
+        setTimeLeft(Math.floor((180000 - timeDifference) / 1000)); // Set the time left to the remaining time
+      }
+    }
+  }, [createdOn, currentTime]); // Add createdOn and currentTime to the dependency array
 
   const handleCancelRide = () => {
       setShowCancelModal(true); // Show confirmation modal
-    
   };
 
   const confirmCancelRide = () => {
@@ -86,136 +112,14 @@ console.log('tripDetails',tripDetails)
     onAddClick(); // Trigger ride cancellation mutation
   };
 
-  useEffect(() => {
-    const setupWebSocket = async () => {
-      try {
-        // Get the authentication token
-        const token = await AsyncStorage.getItem('idToken');
-        if (!token) {
-          console.error('No authentication token found');
-          return;
-        }
-        console.log('Token retrieved:', token);
-    
-        // Setup headers for the WebSocket connection
-        const headers = {
-          Authorization: `Bearer ${token}`,
-          host: '7w4zpgctonb7ldpcg4bam3jrbi.appsync-api.ap-southeast-1.amazonaws.com',
-        };
-        const base64Headers = btoa(JSON.stringify(headers));
-        const base64Payload = btoa(JSON.stringify({})); // Properly stringify empty object
-    
-        // Define the WebSocket URL with encoded headers
-        const websocketUrl = `wss://7w4zpgctonb7ldpcg4bam3jrbi.appsync-realtime-api.ap-southeast-1.amazonaws.com/graphql?header=${base64Headers}&payload=${base64Payload}`;
-    
-        const websocket = new WebSocket(websocketUrl, 'graphql-ws');
-    
-        websocket.onopen = () => {
-          console.log('WebSocket connected');
-    
-          // Initialize connection with `connection_init` message
-          websocket.send(
-            JSON.stringify({
-              type: 'connection_init',
-              payload: {
-                Authorization: `Bearer ${token}`,
-              },
-            })
-          );
-        };
-    
-        websocket.onmessage = (event) => {
-          try {
-            const message = JSON.parse(event.data);
-            console.log('Received message7:', message);
-    
-            // Handle keep-alive messages
-            if (message.type === 'ka') {
-              return; // Ignore keep-alive messages
-            }
-    
-            if (message.type === 'connection_ack') {
-              console.log('Connection acknowledged by server.');
-    
-              // Start subscription after connection acknowledgment
-              const subscriptionMessage = {
-                id: '7',
-                type: 'start',
-                payload: {
-                  data: "{\"query\": \"subscription MySubscription {\\n deleteRiderRequestedTrip {\\n responsestatus \\n }}\"}",
-                  extensions: {
-                    authorization: {
-                      host: '7w4zpgctonb7ldpcg4bam3jrbi.appsync-api.ap-southeast-1.amazonaws.com',
-                      Authorization: `Bearer ${token}`
-                    }
-                  }
-                }
-              };
-              
-              console.log('Sending subscription message:', subscriptionMessage);
-              websocket.send(JSON.stringify(subscriptionMessage));
-            }
-    
-            if (message.type === 'data') {
-              // Handle subscription data
-              console.log('Received subscription data:', message.payload);
-              const responsestatus = message?.payload?.data?.deleteRiderRequestedTrip?.responsestatus;
-            //   setRiderPhnum(message?.payload?.data?.updatedPaymentCaptured?.riderphonenumber);
-            //   setDriverPhnum(message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber);
-            //   setDriverPK(message?.payload?.data?.updatedPaymentCaptured?.PK);
-            //   setDriverSK(message?.payload?.data?.updatedPaymentCaptured?.SK);
-              if (responsestatus) {
-                console.log('Trip Ended:', responsestatus);
-                tripRefetchdetails()
-                setShowDriverNotFound(true); // Show "Driver Not Found" message
-                setTimeout(() => {
-                  setShowDriverNotFound(false); // Close the modal after 2 seconds
-                  onClose();
-                }, 4000);
-                // refetch({ input: { userType: 'driver', driverphonenumber: message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber } });
-                // tripRefetch({ input: { PK: message?.payload?.data?.updatedPaymentCaptured?.PK, SK: message?.payload?.data?.updatedPaymentCaptured?.SK } });
+   const onNotFound = () => {
+    setShowDriverNotFound(false);
+    onClose();
+  };
 
-                // setLoading(false);
-                // setDriverFound(true);
-                // setIsBooking(true); 
+  
 
-              }
-            }
-    
-            if (message.type === 'error') {
-              console.error('Subscription error:', JSON.stringify(message));
-              if (message.payload?.errors?.[0]?.message) {
-                console.error('Detailed subscription error:', message.payload.errors[0].message);
-              }
-            }
-          } catch (err) {
-            console.error('Error processing WebSocket message5:', err);
-          }
-        };
-    
-        websocket.onerror = (error) => {
-          // console.error('WebSocket error:', error);
-        };
-    
-        websocket.onclose = () => {
-          console.log('WebSocket disconnected, retrying...');
-          setTimeout(setupWebSocket, 3000);
-        };
-    
-        setWs(websocket);
-      } catch (err) {
-        console.error('Error in setupWebSocket:', err);
-      }
-    };
-  
-    setupWebSocket();
-  
-    return () => {
-      if (ws) {
-        ws.close();
-      }
-    };
-  }, []);
+ 
 
   return (
     <View style={styles.container}>
@@ -227,8 +131,10 @@ console.log('tripDetails',tripDetails)
             style={styles.avatar}
           />
         </View>
-
-        <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
+ <Text style={styles.statusTextarray}>
+          {statusMessages[currentMessageIndex]} {/* Display the current status message */}
+        </Text>
+        <ProgressBar progress={progress} color={'#000'} style={{width: '100%', height: 10, marginBottom: 20,borderRadius:10}} />
 
         <TouchableOpacity
           style={[
@@ -268,25 +174,9 @@ console.log('tripDetails',tripDetails)
           </View>
         </Modal>
       )}
-      {showDriverNotFound && (
-        <Modal transparent animationType="fade" visible={showDriverNotFound}>
-          <View style={styles.overlay}>
-          <View style={styles.modalCard}>
-          {/* Add your image */}
-          <Image
-            source={require('../assets/images/notfound.png')} // Replace with your image path
-            style={styles.image}
-          />
-          <Text style={styles.modalTitle}>Oops! Boat Driver Not Found</Text>
-          <Text style={styles.modalSubtitle}>
-            It seems we couldn't find a boat driver for your trip. Please try booking again.
-          </Text>
-          {/* Retry button */}
+      
+       
 
-        </View>
-          </View>
-        </Modal>
-      )}
 
     </View>
   );
@@ -323,6 +213,14 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 15,
   },
+  statusTextarray: {
+    fontSize: 16,          // Slightly smaller font for a clean look
+    color: "#555",         // Neutral gray color for readability
+    fontWeight: "500",     // Medium weight for better emphasis
+    textAlign: "center",   // Center-align the text
+    marginBottom: 20,      // Add spacing below for better layout
+    lineHeight: 22,        // Improved readability for multiline text
+  },
   avatarContainer: {
     justifyContent: "center",
     alignItems: "center",
@@ -332,13 +230,6 @@ const styles = StyleSheet.create({
     width: 150,
     height: 100,
     borderRadius: 40,
-  },
-  timerText: {
-    fontSize: 36,
-    fontWeight: "bold",
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 20,
   },
   cancelButton: {
     padding: 15,
@@ -422,6 +313,19 @@ const styles = StyleSheet.create({
   },
   modalWaitText: {
     color: "#333",
+    fontWeight: "bold",
+  },
+  doneButton: {
+    backgroundColor: "#007BFF", // Blue button
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: "center",
+    width: "100%",
+  },
+  doneButtonText: {
+    color: "#fff",
+    fontSize: 16,
     fontWeight: "bold",
   },
 });

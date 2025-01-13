@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { View, Text, StyleSheet, Image, TouchableOpacity, Switch } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import PersonIcon from "react-native-vector-icons/Ionicons";
 import { getUserInfo } from "../query/query";
 import { useQuery } from "@apollo/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -10,8 +11,8 @@ const isAuthenticated = async () => {
   try {
     const authToken = await AsyncStorage.getItem('authToken');
     const userInfo = await AsyncStorage.getItem('userInfo');
-    console.log('authToken', authToken);
-    console.log('userInfo', userInfo);
+    //console.log('authToken', authToken);
+    //console.log('userInfo', userInfo);
     return !!authToken;
   } catch (error) {
     console.error('Error checking authentication:', error);
@@ -66,14 +67,16 @@ const ProfileScreen = () => {
     <View style={styles.container}>
       {/* Header Section */}
       <View style={styles.header}>
-        <Image
+      <PersonIcon name="person-circle-sharp" size={80} color="#ccc" />
+
+        {/* <Image
           source={{ uri: "https://via.placeholder.com/100" }} // Replace with the user's profile image URL
           style={styles.profileImage}
-        />
+        /> */}
         <Text style={styles.name}>{data?.getUserInfo[0]?.riderfirstname} {data?.getUserInfo[0]?.riderlastname}</Text>
         <Text style={styles.phoneNumber}>{data?.getUserInfo[0]?.SK}</Text>
         <TouchableOpacity>
-          <Text style={styles.editProfile}>Edit Profile</Text>
+          {/* <Text style={styles.editProfile}>Edit Profile</Text> */}
         </TouchableOpacity>
       </View>
 

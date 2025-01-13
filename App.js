@@ -24,7 +24,7 @@
 //     RazorpayCheckout.open(options)
 //       .then((data) => {
 //         // Payment successful
-//         console.log('Payment successful', data);
+//         //console.log('Payment successful', data);
 //       })
 //       .catch((error) => {
 //         // Payment failed
@@ -77,7 +77,7 @@ export default function App() {
     // Show a loading state while checking authentication
     return null; // Replace with a spinner if needed
   }
-console.log('isAuthenticated',isAuthenticated)
+//console.log('isAuthenticated',isAuthenticated)
   // if (!isAuthenticated) {
   //    return (
   //     <ApolloProvider client={client}>

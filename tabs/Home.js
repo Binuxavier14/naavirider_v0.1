@@ -1,6 +1,6 @@
-import { Image, StyleSheet, Platform, View, Text, TextInput, TouchableOpacity, Animated, Easing, ScrollView, ActivityIndicator, Dimensions, Alert, Button } from 'react-native';
+import { Image, StyleSheet, Platform, View, Text, TextInput, TouchableOpacity, Animated, Easing, ScrollView, ActivityIndicator, Dimensions, Alert, Button, Modal } from 'react-native';
 
-
+import PersonIcon from "react-native-vector-icons/Ionicons";
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useEffect, useRef, useState } from 'react';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -14,6 +14,9 @@ import { Dropdown } from 'react-native-element-dropdown';
 import RideRequestScreen from './RideRequestScreen';
 import notifee, { AndroidImportance ,EventType} from '@notifee/react-native';
 import messaging from '@react-native-firebase/messaging';
+import { useRefetch } from '../RefetchProvider';
+import ModalAlerts from './ModalAlerts';
+import Toast from './Toast';
 
 const generateTimeSlots = (startTime, endTime) => {
   const timeSlots = [];
@@ -63,13 +66,20 @@ export default function Home({route, navigation }) {
   const [driverPK ,setDriverPK] = useState('');
   const [driverSK ,setDriverSK] = useState('');
   const [boatsWithCapacity, setBoatsWithCapacity] = useState([]);
-
+  const [laterPayment, setlaterPayment] = useState(false);
   const [tripDetails, setTripDetails] = useState(null);
   const [showRideRequest, setShowRideRequest] = useState(false);
   const [tripData, setTripData] = useState(null); // State to store API response
-  const [fetchData] = useLazyQuery(getBoatTypes);
+  const [modaldriverfound, setModaldriverfound] = useState(false);
+  const [modalpaymentdone, setModalPayment] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [tripassigned, setTripAssigned] = useState(false);
+  const [showNotFound, setShowNotFound] = useState(false); // For "Driver Not Found" logic
 
-// console.log('selectedBoat',selectedBoat)
+  const [fetchData] = useLazyQuery(getBoatTypes);
+  const { refetchFunction } = useRefetch();
+
+// //console.log('tripData',tripData)
   const handleSelect = (zone) => {
     setSelectedZone(zone.name);
   };
@@ -79,14 +89,14 @@ export default function Home({route, navigation }) {
       setIsBooking(true);
       setTripData(route.params.tripDetails)
       }
-      console.log('trip',route.params.tripDetails?.tripsk)
+      // //console.log('trip',route.params.tripDetails?.tripsk)
       setSelectedTripType(route.params.tripDetails?.tripType)
       setTripDetails(JSON.parse(route.params.tripDetails?.tripamountinfo)); 
       setRiderRequestSK(route.params.tripDetails?.tripsk)
       setRiderRequestPK(route.params.tripDetails?.trippk)
     }
   }, [route.params]);
-  // console.log('tripDetails',tripDetails);
+  // //console.log('tripDetails',tripDetails);
 
   useEffect(() => {
     const now = new Date();
@@ -109,7 +119,7 @@ export default function Home({route, navigation }) {
   }, []);
 
   const handleDateSelection = (key) => {
-    console.log('key',key)
+    // //console.log('key',key)
     setSelectedDate(key);
     setSelectedDateEpoch(Math?.floor(dateLabels[key || selectedDate]?.epoch / 1000));
     if(key === 'Today'){
@@ -120,13 +130,13 @@ export default function Home({route, navigation }) {
     }
   };
   const handleDateTimeSelection = (key) => {
-    console.log('key',key)
+    // //console.log('key',key)
     setSelectedTime(key?.value)
     setSelectedDateEpoch(Math?.floor(dateLabels[selectedDate]?.epoch / 1000));
 
   };
   
-// console.log('selectedDateEpoch',selectedDateEpoch)
+// //console.log('selectedDateEpoch',selectedDateEpoch)
   useEffect(() => {
     const now = new Date();
     const currentMinutes = getStartOfDayMinutes(now.getHours(), now.getMinutes());
@@ -149,7 +159,7 @@ export default function Home({route, navigation }) {
     setTimeSlots(slots);
   }, [selectedDate]);
 
-// console.log('timeSlots',timeSlots)
+// //console.log('timeSlots',timeSlots)
   const openMenu = () => setVisible(true);
   const closeMenu = () => setVisible(false);
 
@@ -165,7 +175,7 @@ export default function Home({route, navigation }) {
   const toggleCard = () => {
     Animated.timing(cardHeight, {
       toValue: isExpanded ? 380 : 650,
-      duration: 300,
+      duration: 100,
       easing: Easing.ease,
       useNativeDriver: false,
     }).start();
@@ -208,6 +218,7 @@ export default function Home({route, navigation }) {
     fetchPolicy: "network-only",
     variables: { input: { } },
   });
+  // //console.log('zonelist',zonelist)
   const { data:boatsss } = useQuery(getBoatTypePrice, {
     fetchPolicy: "network-only",
     variables: { input: { } },
@@ -218,16 +229,16 @@ export default function Home({route, navigation }) {
         let capacity;
         switch (boat.SK) {
           case "BOATTYPE#SMALL":
-            capacity = "1-3";
+            capacity = "1-10";
             break;
           case "BOATTYPE#MEDIUM":
-            capacity = "1-5";
+            capacity = "1-20";
             break;
           case "BOATTYPE#LARGE":
-            capacity = "5-10";
+            capacity = "1-30";
             break;
           case "BOATTYPE#EXTRALARGE":
-            capacity = "10-15";
+            capacity = "1-40";
             break;
           default:
             capacity = "0";
@@ -240,31 +251,31 @@ export default function Home({route, navigation }) {
 
   // console.log('boatsss',boatsWithCapacity)
 
-  // console.log('zonelist',zonelist)
+  // //console.log('zonelist',zonelist)
   const toCamelCase = (str) => str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
   const formattedZoneOptions = zonelist?.getZonesList.map((zone) => ({
     ...zone,
     zonenameCamelCase: toCamelCase(zone.zonename),
   })) || [];
-// console.log('formattedZoneOptions',zonelist)
+// //console.log('formattedZoneOptions',zonelist)
   
   const { data:triprequestData, loading: requestLoading,refetch:tripRefetchdetails } = useQuery(getTripUser, {
     fetchPolicy: "network-only",
     variables: { input: {} },
     onCompleted: (fetchedData) => {
-      setTripData(fetchedData?.getTripUser[0] || null); 
+      // setTripData(fetchedData?.getTripUser[0] || null); 
       // setTripDetails(JSON.parse(fetchedData?.getTripUser[0]?.tripamountinfo)); 
       // setSelectedTripType(fetchedData?.getTripUser[0]?.tripType)
 
     },
   });
-// console.log('triprequestData',triprequestData)
+// //console.log('triprequestData',triprequestData)
   const [getorderIDdata, { loading: orderIDLoading }] = useLazyQuery(
     getPaymentOrderId,
     {
       fetchPolicy: "network-only",
       onCompleted: (response) => {
-       console.log('response',response)
+      //  //console.log('response',response)
        const amountsent = selectedTripType === "Full Trip"
        ? (selectedPayementmethod === 'Full Payment' ? selectedBoat?.triptype_full_with_margin_gst || tripDetails?.triptype_full_with_margin_gst : selectedBoat?.triptype_full_partial_gst || tripDetails?.triptype_full_partial_gst) 
        : selectedTripType === "Half Trip"
@@ -273,11 +284,22 @@ export default function Home({route, navigation }) {
        
        const forBooklater  = JSON.stringify({'pkskvalue': `${riderRequestPkBookLater}$#$${riderRequestSkBookLater}`, 'bookingtype': `${bookingType}`});
        const forBooknow  = JSON.stringify({'pkskvalue': `${riderRequestPk}$#$${riderRequestSk}`, 'bookingtype': `${bookingType}`});
+       const notes =
+       bookingType === 'now'
+         ? {
+             pkskvalue: `${riderRequestPk}$#$${riderRequestSk}`,
+             bookingtype: bookingType,
+           }
+         : {
+             pkskvalue: `${riderRequestPkBookLater}$#$${riderRequestSkBookLater}`,
+             bookingtype: bookingType,
+           };
+   
            const options = {
          description: bookingType === 'now' ? forBooknow : forBooklater,
          image: 'https://your-logo-url.com/logo.png',
          currency: 'INR',
-         key: 'rzp_test_hFWHEWrGaQh7hO',
+         key: 'rzp_test_vGHcGnfF7EcM0B',
          amount: amountsent * 100,
          order_id: response?.getPaymentOrderId?.orderID,
          name: 'Your Company Name',
@@ -286,16 +308,24 @@ export default function Home({route, navigation }) {
            contact: '9999999999',
            name: 'John Doe'
          },
-         theme: { color: '#53a20e' }
+         theme: { color: '#53a20e' },
+         notes: notes, // Adding notes object
+         timeout: 30, // Timeout in seconds
+
        };
-       
+       let timeout = setTimeout(() => {
+        alert('Payment process timed out after 3 minutes!');
+      }, 30000);
+
        RazorpayCheckout.open(options)
          .then((data) => {
+          clearTimeout(timeout);  // Clear timeout if payment is successful before 3 minutes
            // Payment successful
-           console.log('Payment successful', data);
+           //console.log('Payment successful', data);
          })
          .catch((error) => {
            // Payment failed
+           clearTimeout(timeout);  // Clear timeout if payment fails before 3 minutes
            console.error('Payment failed', error);
          });
       },
@@ -318,48 +348,48 @@ export default function Home({route, navigation }) {
     variables: { input: { userType: 'driver', driverphonenumber: driverPhnum } },
     skip: !driverPhnum, 
     onCompleted: (fetchedData) => {
-      console.log('Driver Details fetched:', fetchedData.getUserDetails);
+      // //console.log('Driver Details fetched:', fetchedData.getUserDetails);
       setDriverFound(true);
 
-      Alert.alert(
-        'Driver Details',
-        `Name: ${fetchedData.getUserDetails.driverFirstName}`
-      );
+      // Alert.alert(
+      //   'Driver Details',
+      //   `Name: ${fetchedData.getUserDetails.driverFirstName}`
+      // );
     },
     onError: (error) => {
-        console.error('Error fetching driver details:', error);
-        Alert.alert('Error', 'Failed to fetch driver details.');
+        // console.error('Error fetching driver details:', error);
+        // Alert.alert('Error', 'Failed to fetch driver details.');
       },
     });
-
+console.log('driverdetails',driverdetails)
     const { data:tripdetails, loading:triploading, refetch:tripRefetch } = useQuery(getPaymentTrip, {
         fetchPolicy: 'network-only', 
         variables: { input: { PK: driverPK, SK: driverSK } },
         skip: !driverSK && !driverPK, 
         onCompleted: (fetchedData) => {
-          console.log('Trip Details fetched:', fetchedData.getPaymentTrip);
-          Alert.alert(
-            'Trip Details',
-            `Name: ${fetchedData.getPaymentTrip.otp}`
-          );
+          // //console.log('Trip Details fetched:', fetchedData.getPaymentTrip);
+          // Alert.alert(
+          //   'Trip Details',
+          //   `Name: ${fetchedData.getPaymentTrip.otp}`
+          // );
         },
         onError: (error) => {
-            console.error('Error fetching Trip details:', error);
-            Alert.alert('Error', 'Failed to fetch Trip details.');
+            // console.error('Error fetching Trip details:', error);
+            // Alert.alert('Error', 'Failed to fetch Trip details.');
           },
         });
 
-// console.log('tripdetails',tripdetails)
+// //console.log('tripdetails',tripdetails)
   useEffect(() => {
     const setupWebSocket = async () => {
       try {
         // Get the authentication token
         const token = await AsyncStorage.getItem('idToken');
         if (!token) {
-          console.error('No authentication token found');
+          // console.error('No authentication token found');
           return;
         }
-        console.log('Token retrieved:', token);
+        // //console.log('Token retrieved:', token);
     
         // Setup headers for the WebSocket connection
         const headers = {
@@ -375,7 +405,7 @@ export default function Home({route, navigation }) {
         const websocket = new WebSocket(websocketUrl, 'graphql-ws');
     
         websocket.onopen = () => {
-          console.log('WebSocket connected');
+          //console.log('WebSocket connected');
     
           // Initialize connection with `connection_init` message
           websocket.send(
@@ -391,7 +421,7 @@ export default function Home({route, navigation }) {
         websocket.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
-            console.log('Received message1:', message);
+            // //console.log('Received message1:', message);
     
             // Handle keep-alive messages
             if (message.type === 'ka') {
@@ -399,7 +429,7 @@ export default function Home({route, navigation }) {
             }
     
             if (message.type === 'connection_ack') {
-              console.log('Connection acknowledged by server.');
+              //console.log('Connection acknowledged by server.');
     
               const subscriptionData = {
                 query: `
@@ -431,37 +461,41 @@ export default function Home({route, navigation }) {
                 }
               };
               
-              console.log('Sending subscription message:', subscriptionMessage);
+              // //console.log('Sending subscription message:', subscriptionMessage);
               websocket.send(JSON.stringify(subscriptionMessage));
             }
     
             if (message.type === 'data') {
               // Handle subscription data
-              console.log('Received subscription data:', message.payload);
+              // //console.log('Received subscription data:', message.payload);
               const responsestatus = message?.payload?.data?.acceptedTrip?.responsestatus;
               setRiderRequestPK(message?.payload?.data?.acceptedTrip?.PK);
               setRiderRequestSK(message?.payload?.data?.acceptedTrip?.SK)
               if (responsestatus) {
-                console.log('AcceptedTrip subscription successful:', responsestatus);
-                Alert.alert('Driver Found', 'Your driver has accepted the trip.');
+                // //console.log('AcceptedTrip subscription successful:', responsestatus);
+                // setModaldriverfound(true)
+                setToastVisible(true);
                 setLoading(false);
                 setIsBooking(true); 
                 tripRefetchdetails();
                 setShowRideRequest(false);
+                if(refetchFunction){
+                refetchFunction();
+                }
 
 
               }
             }
     
             if (message.type === 'error') {
-              console.error('Subscription error:', JSON.stringify(message));
+              // console.error('Subscription error:', JSON.stringify(message));
               if (message.payload?.errors?.[0]?.message) {
                 // console.error('Detailed subscription error:', message.payload.errors[0].message);
                 // Alert.alert('Subscription Error', message.payload.errors[0].message);
               }
             }
           } catch (err) {
-            console.error('Error processing WebSocket message1:', err);
+            // console.error('Error processing WebSocket message1:', err);
           }
         };
     
@@ -470,13 +504,13 @@ export default function Home({route, navigation }) {
         };
     
         websocket.onclose = () => {
-          console.log('WebSocket disconnected, retrying...');
+          // //console.log('WebSocket disconnected, retrying...');
           setTimeout(setupWebSocket, 3000);
         };
     
         setWs(websocket);
       } catch (err) {
-        console.error('Error in setupWebSocket:', err);
+        // console.error('Error in setupWebSocket:', err);
       }
     };
   
@@ -487,7 +521,7 @@ export default function Home({route, navigation }) {
         ws.close();
       }
     };
-  }, [data]);
+  }, [data,refetchFunction]);
 
 
   useEffect(() => {
@@ -496,10 +530,10 @@ export default function Home({route, navigation }) {
         // Get the authentication token
         const token = await AsyncStorage.getItem('idToken');
         if (!token) {
-          console.error('No authentication token found');
+          // console.error('No authentication token found');
           return;
         }
-        console.log('Token retrieved:', token);
+        // //console.log('Token retrieved:', token);
     
         // Setup headers for the WebSocket connection
         const headers = {
@@ -515,7 +549,7 @@ export default function Home({route, navigation }) {
         const websocket = new WebSocket(websocketUrl, 'graphql-ws');
     
         websocket.onopen = () => {
-          console.log('WebSocket connected');
+          // //console.log('WebSocket connected');
     
           // Initialize connection with `connection_init` message
           websocket.send(
@@ -531,7 +565,7 @@ export default function Home({route, navigation }) {
         websocket.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
-            console.log('Received message2:', message);
+            // //console.log('Received message2:', message);
     
             // Handle keep-alive messages
             if (message.type === 'ka') {
@@ -539,14 +573,32 @@ export default function Home({route, navigation }) {
             }
     
             if (message.type === 'connection_ack') {
-              console.log('Connection acknowledged by server.');
+              // //console.log('Connection acknowledged by server.');
     
               // Start subscription after connection acknowledgment
+              const subscriptionData = {
+                query: `
+                  subscription MySubscription($riderphonenumber: String!) {
+                    updatedPaymentCaptured(riderphonenumber: $riderphonenumber) {
+                      responsestatus
+                      PK
+                      SK
+                      driverphonenumber
+                      riderphonenumber
+                    }
+                  }
+                `,
+                variables: {
+                  riderphonenumber: data && data?.getUserInfo[0]?.SK, // Replace with dynamic value if needed
+                },
+              };
+              
               const subscriptionMessage = {
                 id: '2',
                 type: 'start',
                 payload: {
-                  data: "{\"query\": \"subscription MySubscription {\\n updatedPaymentCaptured {\\n responsestatus \\n riderphonenumber \\n driverphonenumber \\n PK \\n SK \\n }}\"}",
+                  // data: "{\"query\": \"subscription MySubscription {\\n updatedPaymentCaptured {\\n responsestatus \\n riderphonenumber \\n driverphonenumber \\n PK \\n SK \\n }}\"}",
+                  data: JSON.stringify(subscriptionData),
                   extensions: {
                     authorization: {
                       host: '7w4zpgctonb7ldpcg4bam3jrbi.appsync-api.ap-southeast-1.amazonaws.com',
@@ -556,24 +608,28 @@ export default function Home({route, navigation }) {
                 }
               };
               
-              console.log('Sending subscription message:', subscriptionMessage);
+              // //console.log('Sending subscription message:', subscriptionMessage);
               websocket.send(JSON.stringify(subscriptionMessage));
             }
     
             if (message.type === 'data') {
               // Handle subscription data
-              console.log('Received subscription data:', message.payload);
+              // //console.log('Received subscription data:', message.payload);
               const responsestatus = message?.payload?.data?.updatedPaymentCaptured?.responsestatus;
               setRiderPhnum(message?.payload?.data?.updatedPaymentCaptured?.riderphonenumber);
               setDriverPhnum(message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber);
               setDriverPK(message?.payload?.data?.updatedPaymentCaptured?.PK);
               setDriverSK(message?.payload?.data?.updatedPaymentCaptured?.SK);
               if (responsestatus) {
-                console.log('Payment successful:', responsestatus);
-                Alert.alert('Paymnet', 'Your Payment was succesful.');
+                // //console.log('Payment successful:', responsestatus);
+
+                setModalPayment(true);
                 refetch({ input: { userType: 'driver', driverphonenumber: message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber } });
                 tripRefetch({ input: { PK: message?.payload?.data?.updatedPaymentCaptured?.PK, SK: message?.payload?.data?.updatedPaymentCaptured?.SK } });
-                sendPaymentNotification();
+                // sendPaymentNotification();
+                if(refetchFunction){
+                  refetchFunction();
+                  }
                 // setLoading(false);
                 // setDriverFound(true);
                 // setIsBooking(true); 
@@ -582,14 +638,14 @@ export default function Home({route, navigation }) {
             }
     
             if (message.type === 'error') {
-              console.error('Subscription error:', JSON.stringify(message));
+              // console.error('Subscription error:', JSON.stringify(message));
               if (message.payload?.errors?.[0]?.message) {
-                console.error('Detailed subscription error:', message.payload.errors[0].message);
-                Alert.alert('Subscription Error', message.payload.errors[0].message);
+                // console.error('Detailed subscription error:', message.payload.errors[0].message);
+                // Alert.alert('Subscription Error', message.payload.errors[0].message);
               }
             }
           } catch (err) {
-            console.error('Error processing WebSocket message2:', err);
+            // console.error('Error processing WebSocket message2:', err);
           }
         };
     
@@ -598,13 +654,13 @@ export default function Home({route, navigation }) {
         };
     
         websocket.onclose = () => {
-          console.log('WebSocket disconnected, retrying...');
+          // //console.log('WebSocket disconnected, retrying...');
           setTimeout(setupWebSocket, 3000);
         };
     
         setWs(websocket);
       } catch (err) {
-        console.error('Error in setupWebSocket:', err);
+        // console.error('Error in setupWebSocket:', err);
       }
     };
   
@@ -615,7 +671,7 @@ export default function Home({route, navigation }) {
         ws.close();
       }
     };
-  }, []);
+  }, [data,refetchFunction]);
 
   useEffect(() => {
     const setupWebSocket = async () => {
@@ -623,10 +679,10 @@ export default function Home({route, navigation }) {
         // Get the authentication token
         const token = await AsyncStorage.getItem('idToken');
         if (!token) {
-          console.error('No authentication token found');
+          // console.error('No authentication token found');
           return;
         }
-        console.log('Token retrieved:', token);
+        // //console.log('Token retrieved:', token);
     
         // Setup headers for the WebSocket connection
         const headers = {
@@ -642,7 +698,7 @@ export default function Home({route, navigation }) {
         const websocket = new WebSocket(websocketUrl, 'graphql-ws');
     
         websocket.onopen = () => {
-          console.log('WebSocket connected');
+          // //console.log('WebSocket connected');
     
           // Initialize connection with `connection_init` message
           websocket.send(
@@ -658,7 +714,7 @@ export default function Home({route, navigation }) {
         websocket.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
-            console.log('Received message3:', message);
+            // //console.log('Received message3:', message);
     
             // Handle keep-alive messages
             if (message.type === 'ka') {
@@ -666,14 +722,29 @@ export default function Home({route, navigation }) {
             }
     
             if (message.type === 'connection_ack') {
-              console.log('Connection acknowledged by server.');
+              // //console.log('Connection acknowledged by server.');
     
               // Start subscription after connection acknowledgment
+              const subscriptionData = {
+                query: `
+                  subscription MySubscription($riderphonenumber: String!) {
+                    tripLaterPaymentCaptured_sub(riderphonenumber: $riderphonenumber) {
+                      responsestatus
+                  
+                    }
+                  }
+                `,
+                variables: {
+                  riderphonenumber: data && data?.getUserInfo[0]?.SK, // Replace with dynamic value if needed
+                },
+              };
+
               const subscriptionMessage = {
                 id: '5',
                 type: 'start',
                 payload: {
-                  data: "{\"query\": \"subscription MySubscription {\\n tripLaterPaymentCaptured_sub {\\n responsestatus \\n }}\"}",
+                  // data: "{\"query\": \"subscription MySubscription {\\n tripLaterPaymentCaptured_sub {\\n responsestatus \\n }}\"}",
+                  data: JSON.stringify(subscriptionData),
                   extensions: {
                     authorization: {
                       host: '7w4zpgctonb7ldpcg4bam3jrbi.appsync-api.ap-southeast-1.amazonaws.com',
@@ -683,24 +754,30 @@ export default function Home({route, navigation }) {
                 }
               };
               
-              console.log('Sending subscription message:', subscriptionMessage);
+              // //console.log('Sending subscription message:', subscriptionMessage);
               websocket.send(JSON.stringify(subscriptionMessage));
             }
     
             if (message.type === 'data') {
               // Handle subscription data
-              console.log('Received subscription data:', message.payload);
+              // //console.log('Received subscription data:', message.payload);
               const responsestatus = message?.payload?.data?.tripLaterPaymentCaptured_sub?.responsestatus;
               // setRiderPhnum(message?.payload?.data?.updatedPaymentCaptured?.riderphonenumber);
               // setDriverPhnum(message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber);
               // setDriverPK(message?.payload?.data?.updatedPaymentCaptured?.PK);
               // setDriverSK(message?.payload?.data?.updatedPaymentCaptured?.SK);
               if (responsestatus) {
-                console.log('Payment successful:', responsestatus);
-                Alert.alert('Paymnet', 'Your Payment was succesful.');
+                // //console.log('Payment successful:', responsestatus);
+                // Alert.alert('Paymnet', 'Your Payment was succesful.');
                 // refetch({ input: { userType: 'driver', driverphonenumber: message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber } });
                 // tripRefetch({ input: { PK: message?.payload?.data?.updatedPaymentCaptured?.PK, SK: message?.payload?.data?.updatedPaymentCaptured?.SK } });
-                sendPaymentNotification();
+                // sendPaymentNotification();
+                            setIsBooking(false);
+                            setlaterPayment(true)
+                // Alert.alert('Driver', 'You will be assigned a Driver shortly');
+                if(refetchFunction){
+                  refetchFunction();
+                  }
                 // setLoading(false);
                 // setDriverFound(true);
                 // setIsBooking(true); 
@@ -709,154 +786,14 @@ export default function Home({route, navigation }) {
             }
     
             if (message.type === 'error') {
-              console.error('Subscription error:', JSON.stringify(message));
-              if (message.payload?.errors?.[0]?.message) {
-                console.error('Detailed subscription error:', message.payload.errors[0].message);
-                Alert.alert('Subscription Error', message.payload.errors[0].message);
-              }
-            }
-          } catch (err) {
-            console.error('Error processing WebSocket message3:', err);
-          }
-        };
-    
-        websocket.onerror = (error) => {
-          // console.error('WebSocket error:', error);
-        };
-    
-        websocket.onclose = () => {
-          console.log('WebSocket disconnected, retrying...');
-          setTimeout(setupWebSocket, 3000);
-        };
-    
-        setWs(websocket);
-      } catch (err) {
-        console.error('Error in setupWebSocket:', err);
-      }
-    };
-  
-    setupWebSocket();
-  
-    return () => {
-      if (ws) {
-        ws.close();
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const setupWebSocket = async () => {
-      try {
-        // Get the authentication token
-        const token = await AsyncStorage.getItem('idToken');
-        if (!token) {
-          console.error('No authentication token found');
-          return;
-        }
-        console.log('Token retrieved:', token);
-    
-        // Setup headers for the WebSocket connection
-        const headers = {
-          Authorization: `Bearer ${token}`,
-          host: '7w4zpgctonb7ldpcg4bam3jrbi.appsync-api.ap-southeast-1.amazonaws.com',
-        };
-        const base64Headers = btoa(JSON.stringify(headers));
-        const base64Payload = btoa(JSON.stringify({})); // Properly stringify empty object
-    
-        // Define the WebSocket URL with encoded headers
-        const websocketUrl = `wss://7w4zpgctonb7ldpcg4bam3jrbi.appsync-realtime-api.ap-southeast-1.amazonaws.com/graphql?header=${base64Headers}&payload=${base64Payload}`;
-    
-        const websocket = new WebSocket(websocketUrl, 'graphql-ws');
-    
-        websocket.onopen = () => {
-          console.log('WebSocket connected');
-    
-          // Initialize connection with `connection_init` message
-          websocket.send(
-            JSON.stringify({
-              type: 'connection_init',
-              payload: {
-                Authorization: `Bearer ${token}`,
-              },
-            })
-          );
-        };
-    
-        websocket.onmessage = (event) => {
-          try {
-            const message = JSON.parse(event.data);
-            console.log('Received message4:', message);
-    
-            // Handle keep-alive messages
-            if (message.type === 'ka') {
-              return; // Ignore keep-alive messages
-            }
-    
-            if (message.type === 'connection_ack') {
-              console.log('Connection acknowledged by server.');
-
-              const subscriptionData = {
-                query: `
-                  subscription MySubscription($riderphonenumber: String!) {
-                    startedTrip(riderphonenumber: $riderphonenumber) {
-                      responsestatus
-                    }
-                  }
-                `,
-                variables: {
-                  riderphonenumber: data && data?.getUserInfo[0]?.SK, // Replace with dynamic value if needed
-                },
-              };
-    
-              // Start subscription after connection acknowledgment
-              const subscriptionMessage = {
-                id: '3',
-                type: 'start',
-                payload: {
-                  data: JSON.stringify(subscriptionData),
-                    extensions: {
-                    authorization: {
-                      host: '7w4zpgctonb7ldpcg4bam3jrbi.appsync-api.ap-southeast-1.amazonaws.com',
-                      Authorization: `Bearer ${token}`
-                    }
-                  }
-                }
-              };
-              
-              console.log('Sending subscription message:', subscriptionMessage);
-              websocket.send(JSON.stringify(subscriptionMessage));
-            }
-    
-            if (message.type === 'data') {
-              // Handle subscription data
-              console.log('Received subscription data:', message.payload);
-              const responsestatus = message?.payload?.data?.startedTrip?.responsestatus;
-            //   setRiderPhnum(message?.payload?.data?.updatedPaymentCaptured?.riderphonenumber);
-            //   setDriverPhnum(message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber);
-            //   setDriverPK(message?.payload?.data?.updatedPaymentCaptured?.PK);
-            //   setDriverSK(message?.payload?.data?.updatedPaymentCaptured?.SK);
-              if (responsestatus) {
-                console.log('Trip Started:', responsestatus);
-                Alert.alert('Trip', 'Your Trip started.');
-                // refetch({ input: { userType: 'driver', driverphonenumber: message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber } });
-                // tripRefetch({ input: { PK: message?.payload?.data?.updatedPaymentCaptured?.PK, SK: message?.payload?.data?.updatedPaymentCaptured?.SK } });
-
-                // setLoading(false);
-                // setDriverFound(true);
-                // setIsBooking(true); 
-
-              }
-            }
-    
-            if (message.type === 'error') {
-              console.error('Subscription error:', JSON.stringify(message));
+              // console.error('Subscription error:', JSON.stringify(message));
               if (message.payload?.errors?.[0]?.message) {
                 // console.error('Detailed subscription error:', message.payload.errors[0].message);
                 // Alert.alert('Subscription Error', message.payload.errors[0].message);
               }
             }
           } catch (err) {
-            console.error('Error processing WebSocket message4:', err);
+            // console.error('Error processing WebSocket message3:', err);
           }
         };
     
@@ -865,13 +802,13 @@ export default function Home({route, navigation }) {
         };
     
         websocket.onclose = () => {
-          console.log('WebSocket disconnected, retrying...');
+          // //console.log('WebSocket disconnected, retrying...');
           setTimeout(setupWebSocket, 3000);
         };
     
         setWs(websocket);
       } catch (err) {
-        console.error('Error in setupWebSocket:', err);
+        // console.error('Error in setupWebSocket:', err);
       }
     };
   
@@ -882,7 +819,11 @@ export default function Home({route, navigation }) {
         ws.close();
       }
     };
-  }, [data]);
+  }, [data,refetchFunction]);
+
+ 
+
+ 
 
   useEffect(() => {
     const setupWebSocket = async () => {
@@ -890,10 +831,10 @@ export default function Home({route, navigation }) {
         // Get the authentication token
         const token = await AsyncStorage.getItem('idToken');
         if (!token) {
-          console.error('No authentication token found');
+          // console.error('No authentication token found');
           return;
         }
-        console.log('Token retrieved:', token);
+        // //console.log('Token retrieved:', token);
     
         // Setup headers for the WebSocket connection
         const headers = {
@@ -909,7 +850,7 @@ export default function Home({route, navigation }) {
         const websocket = new WebSocket(websocketUrl, 'graphql-ws');
     
         websocket.onopen = () => {
-          console.log('WebSocket connected');
+          // //console.log('WebSocket connected');
     
           // Initialize connection with `connection_init` message
           websocket.send(
@@ -925,7 +866,7 @@ export default function Home({route, navigation }) {
         websocket.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
-            console.log('Received message5:', message);
+            // //console.log('Received message9:', message);
     
             // Handle keep-alive messages
             if (message.type === 'ka') {
@@ -933,25 +874,27 @@ export default function Home({route, navigation }) {
             }
     
             if (message.type === 'connection_ack') {
-              console.log('Connection acknowledged by server.');
+              // //console.log('Connection acknowledged by server.');
     
 
               const subscriptionData = {
                 query: `
-                  subscription MySubscription($riderphonenumber: String!) {
-                    endededTrip(riderphonenumber: $riderphonenumber) {
+                  subscription MySubscription($riderphonenumber: String!,$rstatus: String!) {
+                    deletedAcceptedTrip(riderphonenumber: $riderphonenumber,rstatus: $rstatus) {
                       responsestatus
                     }
                   }
                 `,
                 variables: {
-                  riderphonenumber: data && data?.getUserInfo[0]?.SK, // Replace with dynamic value if needed
+                  riderphonenumber: data && data?.getUserInfo[0]?.SK,
+                  rstatus:'TRIP_ACCEPTED',
+                  // Replace with dynamic value if needed
                 },
               };
 
               // Start subscription after connection acknowledgment
               const subscriptionMessage = {
-                id: '4',
+                id: '9',
                 type: 'start',
                 payload: {
                   // data: "{\"query\": \"subscription MySubscription {\\n endededTrip {\\n responsestatus \\n }}\"}",
@@ -965,22 +908,28 @@ export default function Home({route, navigation }) {
                 }
               };
               
-              console.log('Sending subscription message:', subscriptionMessage);
+              // //console.log('Sending subscription message:', subscriptionMessage);
               websocket.send(JSON.stringify(subscriptionMessage));
             }
     
             if (message.type === 'data') {
               // Handle subscription data
-              console.log('Received subscription data:', message.payload);
-              const responsestatus = message?.payload?.data?.endededTrip?.responsestatus;
+              // //console.log('Received subscription data:', message.payload);
+              const responsestatus = message?.payload?.data?.deletedAcceptedTrip?.responsestatus;
             //   setRiderPhnum(message?.payload?.data?.updatedPaymentCaptured?.riderphonenumber);
             //   setDriverPhnum(message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber);
             //   setDriverPK(message?.payload?.data?.updatedPaymentCaptured?.PK);
             //   setDriverSK(message?.payload?.data?.updatedPaymentCaptured?.SK);
               if (responsestatus) {
-                console.log('Trip Ended:', responsestatus);
-                Alert.alert('Trip', 'Your Trip Ended.');
-                handleClose();
+ Alert.alert('Payment Request Timedout', 'You were ran out of time');
+ setIsBooking(false);
+
+                // //console.log('Trip Ended:', responsestatus);
+                // setTripEnded(true);
+                // handleClose();
+                if(refetchFunction){
+                  refetchFunction();
+                  }
                 // refetch({ input: { userType: 'driver', driverphonenumber: message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber } });
                 // tripRefetch({ input: { PK: message?.payload?.data?.updatedPaymentCaptured?.PK, SK: message?.payload?.data?.updatedPaymentCaptured?.SK } });
 
@@ -992,7 +941,7 @@ export default function Home({route, navigation }) {
             }
     
             if (message.type === 'error') {
-              console.error('Subscription error:', JSON.stringify(message));
+              // console.error('Subscription error:', JSON.stringify(message));
               if (message.payload?.errors?.[0]?.message) {
                 // console.error('Detailed subscription error:', message.payload.errors[0].message);
                 // Alert.alert('Subscription Error', message.payload.errors[0].message);
@@ -1008,7 +957,7 @@ export default function Home({route, navigation }) {
         };
     
         websocket.onclose = () => {
-          console.log('WebSocket disconnected, retrying...');
+          //console.log('WebSocket disconnected, retrying...');
           setTimeout(setupWebSocket, 3000);
         };
     
@@ -1025,7 +974,7 @@ export default function Home({route, navigation }) {
         ws.close();
       }
     };
-  }, [data]);
+  }, [data,refetchFunction]);
 
   useEffect(() => {
     const setupWebSocket = async () => {
@@ -1036,7 +985,7 @@ export default function Home({route, navigation }) {
           console.error('No authentication token found');
           return;
         }
-        console.log('Token retrieved:', token);
+        //console.log('Token retrieved:', token);
     
         // Setup headers for the WebSocket connection
         const headers = {
@@ -1052,7 +1001,7 @@ export default function Home({route, navigation }) {
         const websocket = new WebSocket(websocketUrl, 'graphql-ws');
     
         websocket.onopen = () => {
-          console.log('WebSocket connected');
+          //console.log('WebSocket connected');
     
           websocket.send(
             JSON.stringify({
@@ -1067,7 +1016,7 @@ export default function Home({route, navigation }) {
         websocket.onmessage = (event) => {
           try {
             const message = JSON.parse(event.data);
-            console.log('Received6:', message);
+            //console.log('Received6:', message);
     
             // Handle keep-alive messages
             if (message.type === 'ka') {
@@ -1075,14 +1024,28 @@ export default function Home({route, navigation }) {
             }
     
             if (message.type === 'connection_ack') {
-              console.log('Connection acknowledged by server.');
+              //console.log('Connection acknowledged by server.');
     
               // Start subscription after connection acknowledgment
+              const subscriptionData = {
+                query: `
+                  subscription MySubscription($riderphonenumber: String!) {
+                    assignedDrivertoTrip(riderphonenumber: $riderphonenumber) {
+                      responsestatus
+                     
+                    }
+                  }
+                `,
+                variables: {
+                  riderphonenumber: data && data?.getUserInfo[0]?.SK, // Replace with dynamic value if needed
+                },
+              };
               const subscriptionMessage = {
                 id: '6',
                 type: 'start',
                 payload: {
-                  data: "{\"query\": \"subscription MySubscription {\\n assignedDrivertoTrip {\\n responsestatus \\n }}\"}",
+                  // data: "{\"query\": \"subscription MySubscription {\\n assignedDrivertoTrip {\\n responsestatus \\n }}\"}",
+                  data: JSON.stringify(subscriptionData),
                   extensions: {
                     authorization: {
                       host: 'hpcr5w3qvbbgxe7x3gzuyoerdu.appsync-api.ap-southeast-1.amazonaws.com',
@@ -1092,22 +1055,27 @@ export default function Home({route, navigation }) {
                 }
               };
               
-              console.log('Sending subscription message:', subscriptionMessage);
+              //console.log('Sending subscription message:', subscriptionMessage);
               websocket.send(JSON.stringify(subscriptionMessage));
             }
     
             if (message.type === 'data') {
               // Handle subscription data
-              console.log('Received subscription data:', message.payload);
+              //console.log('Received subscription data:', message.payload);
               const responsestatus = message?.payload?.data?.assignedDrivertoTrip?.responsestatus;
             //   setRiderPhnum(message?.payload?.data?.updatedPaymentCaptured?.riderphonenumber);
             //   setDriverPhnum(message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber);
             //   setDriverPK(message?.payload?.data?.updatedPaymentCaptured?.PK);
             //   setDriverSK(message?.payload?.data?.updatedPaymentCaptured?.SK);
               if (responsestatus) {
-                console.log('Driver has been assigned:', responsestatus);
-                Alert.alert('Driver Assigned', 'Driver has been assigned.');
+                //console.log('Driver has been assigned:', responsestatus);
+                // Alert.alert('Driver Assigned', 'Driver has been assigned.');
+                setTripAssigned(true);
                 handleClose();
+                // sendTripLaterDriverNotification();
+                if(refetchFunction){
+                  refetchFunction();
+                  }
                 // refetch({ input: { userType: 'driver', driverphonenumber: message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber } });
                 // tripRefetch({ input: { PK: message?.payload?.data?.updatedPaymentCaptured?.PK, SK: message?.payload?.data?.updatedPaymentCaptured?.SK } });
 
@@ -1119,10 +1087,10 @@ export default function Home({route, navigation }) {
             }
     
             if (message.type === 'error') {
-              console.error('Subscription error:', JSON.stringify(message));
+              // console.error('Subscription error:', JSON.stringify(message));
               if (message.payload?.errors?.[0]?.message) {
-                console.error('Detailed subscription error:', message.payload.errors[0].message);
-                Alert.alert('Subscription Error', message.payload.errors[0].message);
+                // console.error('Detailed subscription error:', message.payload.errors[0].message);
+                // Alert.alert('Subscription Error', message.payload.errors[0].message);
               }
             }
           } catch (err) {
@@ -1135,7 +1103,7 @@ export default function Home({route, navigation }) {
         };
     
         websocket.onclose = () => {
-          console.log('WebSocket disconnected, retrying...');
+          //console.log('WebSocket disconnected, retrying...');
           setTimeout(setupWebSocket, 3000);
         };
     
@@ -1152,16 +1120,161 @@ export default function Home({route, navigation }) {
         ws.close();
       }
     };
-  }, []);
+  }, [data,refetchFunction]);
+
+  useEffect(() => {
+    const setupWebSocket = async () => {
+      try {
+        // Get the authentication token
+        const token = await AsyncStorage.getItem('idToken');
+        if (!token) {
+          console.error('No authentication token found');
+          return;
+        }
+        //console.log('Token retrieved:', token);
+    
+        // Setup headers for the WebSocket connection
+        const headers = {
+          Authorization: `Bearer ${token}`,
+          host: '7w4zpgctonb7ldpcg4bam3jrbi.appsync-api.ap-southeast-1.amazonaws.com',
+        };
+        const base64Headers = btoa(JSON.stringify(headers));
+        const base64Payload = btoa(JSON.stringify({})); // Properly stringify empty object
+    
+        // Define the WebSocket URL with encoded headers
+        const websocketUrl = `wss://7w4zpgctonb7ldpcg4bam3jrbi.appsync-realtime-api.ap-southeast-1.amazonaws.com/graphql?header=${base64Headers}&payload=${base64Payload}`;
+    
+        const websocket = new WebSocket(websocketUrl, 'graphql-ws');
+    
+        websocket.onopen = () => {
+          //console.log('WebSocket connected');
+    
+          // Initialize connection with `connection_init` message
+          websocket.send(
+            JSON.stringify({
+              type: 'connection_init',
+              payload: {
+                Authorization: `Bearer ${token}`,
+              },
+            })
+          );
+        };
+    
+        websocket.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            //console.log('errorMesage',JSON.stringify(message))
+            //console.log('Received message7:', message);
+    
+            // Handle keep-alive messages
+            if (message.type === 'ka') {
+              return; // Ignore keep-alive messages
+            }
+    
+            if (message.type === 'connection_ack') {
+              //console.log('Connection acknowledged by server.');
+
+              const subscriptionData = {
+                query: `
+                  subscription MySubscription($riderphonenumber: String!,$rstatus: String!,) {
+                    deleteRiderRequestedTrip(riderphonenumber: $riderphonenumber,rstatus: $rstatus) {
+                      responsestatus
+                    }
+                  }
+                `,
+                variables: {
+                  riderphonenumber: data && data?.getUserInfo[0]?.SK, // Replace with dynamic value if needed
+                  rstatus:'RIDER_REQUESTED'
+                },
+              };
+              //console.log('check',`RIDER_REQUESTED#${data && data?.getUserInfo[0]?.SK}`)
+              // Start subscription after connection acknowledgment
+              const subscriptionMessage = {
+                id: '7',
+                type: 'start',
+                payload: {
+                  data: JSON.stringify(subscriptionData),
+                  extensions: {
+                    authorization: {
+                      host: '7w4zpgctonb7ldpcg4bam3jrbi.appsync-api.ap-southeast-1.amazonaws.com',
+                      Authorization: `Bearer ${token}`
+                    }
+                  }
+                }
+              };
+              
+              //console.log('Sending subscription message:', subscriptionMessage);
+              websocket.send(JSON.stringify(subscriptionMessage));
+            }
+    
+            if (message.type === 'data') {
+              // Handle subscription data
+              //console.log('Received subscription data:', message.payload);
+              const responsestatus = message?.payload?.data?.deleteRiderRequestedTrip?.responsestatus;
+              //console.log('responsestatus',responsestatus)
+            //   setDriverPhnum(message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber);
+            //   setDriverPK(message?.payload?.data?.updatedPaymentCaptured?.PK);
+            //   setDriverSK(message?.payload?.data?.updatedPaymentCaptured?.SK);
+              if (responsestatus) {
+                setShowNotFound(true);
+                // Alert.alert('Trip deleted', 'Your Trip has ended');
+                // //console.log('Trip deleted:', responsestatus);
+                tripRefetchdetails();
+
+                // setShowDriverNotFound(true); // Show "Driver Not Found" message
+                // refetch({ input: { userType: 'driver', driverphonenumber: message?.payload?.data?.updatedPaymentCaptured?.driverphonenumber } });
+                // tripRefetch({ input: { PK: message?.payload?.data?.updatedPaymentCaptured?.PK, SK: message?.payload?.data?.updatedPaymentCaptured?.SK } });
+
+                // setLoading(false);
+                // setDriverFound(true);
+                // setIsBooking(true); 
+
+              }
+            }
+    
+            if (message.type === 'error') {
+              // console.error('Subscription error:', JSON.stringify(message));
+              if (message.payload?.errors?.[0]?.message) {
+                // console.error('Detailed subscription error:', message.payload.errors[0].message);
+              }
+            }
+          } catch (err) {
+            // console.error('Error processing WebSocket message5:', err);
+          }
+        };
+    
+        websocket.onerror = (error) => {
+          // console.error('WebSocket error:', error);
+        };
+    
+        websocket.onclose = () => {
+          // //console.log('WebSocket disconnected, retrying...');
+          setTimeout(setupWebSocket, 3000);
+        };
+    
+        setWs(websocket);
+      } catch (err) {
+        // console.error('Error in setupWebSocket:', err);
+      }
+    };
+  
+    setupWebSocket();
+  
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [data]);
 
   const [addUserFunction, { loading: mloading }] = useMutation(
     riderRequestTrip,
     {
       onCompleted: (response) => {
-        console.log('response',response?.riderRequestTrip)
+        // //console.log('response',response?.riderRequestTrip)
 
 if(response?.riderRequestTrip?.responsestatus) {
-  console.log('responsetrip',response?.riderRequestTrip)
+  // //console.log('responsetrip',response?.riderRequestTrip)
   setRiderRequestPKBookLater(response?.riderRequestTrip?.PK);
   setRiderRequestSKBookLater(response?.riderRequestTrip?.SK);
   setLoading(true); 
@@ -1185,21 +1298,75 @@ if(response?.riderRequestTrip?.responsestatus) {
 }     },
     }
   );
-// console.log('redierpk',riderRequestSkBookLater)
-  const handleCloseRideRequest = () => {
-    setShowRideRequest(false); // Close the RideRequestScreen
-    // setLoading(false); 
 
-  };
+  useEffect(() => {
+    if (showRideRequest) {
+      const dataToStore = {
+        showRideRequest: true,
+        bookingType: 'now', 
+        triprequestData: triprequestData, 
+      };
+      AsyncStorage.setItem('rideRequestTimeLeft', JSON.stringify(dataToStore));
+    }
+  }, [showRideRequest, bookingType, triprequestData]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const storedData = await AsyncStorage.getItem('rideRequestData');
+        if (storedData) {
+          const parsedData = JSON.parse(storedData);
+          setShowRideRequest(parsedData.showRideRequest);
+          setBookingType(parsedData.bookingType);
+        } else {
+          // Fetch trip details from your API (if needed)
+          // ...
+        }
+      } catch (error) {
+        // console.error('Error fetching ride request data:', error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    if (triprequestData && triprequestData?.getTripUser && triprequestData?.getTripUser[0]) {
+      // Store the trip data in AsyncStorage when it's available
+      const dataToStore = {
+        showRideRequest: showRideRequest, // Include showRideRequest and bookingType if needed
+        bookingType: bookingType, 
+        triprequestData: triprequestData, 
+      };
+      AsyncStorage.setItem('rideRequestData', JSON.stringify(dataToStore));
+    }
+  }, [triprequestData, showRideRequest, bookingType]); // Include dependencies
+
+// //console.log('redierpk',riderRequestSkBookLater)
+const handleCloseRideRequest = async () => {
+  setShowRideRequest(false);
+
+  // Clear the stored timeLeft from AsyncStorage
+  try {
+    await AsyncStorage.removeItem('rideRequestTimeLeft');
+  } catch (error) {
+    // console.error('Error clearing timeLeft from AsyncStorage:', error);
+  }
+};
+
+const onNotFound = () => {
+  setShowNotFound(false);
+};
+
 
 
   
 
 
   
-  // console.log('pkskvalue',JSON.stringify({'pkskvalue': `${bookLaterPK}$#$${bookLaterSK}`, 'bookingtype':'later'}))
-// console.log('bookingType', bookingType === 'later' ? 'later' : 'now')
-// console.log('selectedDate',selectedDate)
+  // //console.log('pkskvalue',JSON.stringify({'pkskvalue': `${bookLaterPK}$#$${bookLaterSK}`, 'bookingtype':'later'}))
+// //console.log('bookingType', bookingType === 'later' ? 'later' : 'now')
+// //console.log('selectedDate',selectedDate)
   const handleStartJourney = () => {
     setLoading(true); // Show loading overlay
     setTimeout(() => {
@@ -1215,6 +1382,9 @@ if(response?.riderRequestTrip?.responsestatus) {
       variables: {
         input: {
           amount:amountsent * 100 ,
+          paymentType:selectedPayementmethod === 'Full Payment' ? 'full' :'partial',
+          PK: bookingType === 'now' ? riderRequestPk : riderRequestPkBookLater,
+          SK: bookingType === 'now' ? riderRequestSk : riderRequestSkBookLater
          
         },
       },
@@ -1229,11 +1399,11 @@ if(response?.riderRequestTrip?.responsestatus) {
     }, 4000); // Hide after 4 seconds
 
 }
-// console.log('selectedZone',selectedZone?.zoneID)
+// //console.log('selectedZone',selectedZone?.zoneID)
 
 
 const handleBookButtonPress = () => {
-  console.log('hi');
+  // //console.log('hi');
   let   input= {
     cityName : 'VARANASI',
     zoneID : selectedZone?.zoneID,
@@ -1250,7 +1420,6 @@ const handleBookButtonPress = () => {
     zonename:selectedZone?.zonename,
    
   }
-  console.log('input', input)
   addUserFunction({
     variables: {
       input: {
@@ -1310,7 +1479,7 @@ const handleBookButtonPress = () => {
   useEffect(() => {
     // Foreground Notification Handler
     const unsubscribe = messaging().onMessage(async (remoteMessage) => {
-      console.log('Foreground message:', remoteMessage);
+      //console.log('Foreground message:', remoteMessage);
 
       await notifee.displayNotification({
         title: remoteMessage.notification?.title || 'New Notification',
@@ -1340,7 +1509,28 @@ const handleBookButtonPress = () => {
         },
       });
 
-      console.log('Payment notification sent.');
+      // //console.log('Payment notification sent.');
+    } catch (error) {
+      console.error('Error displaying notification:', error);
+    }
+  };
+
+  const sendTripLaterDriverNotification = async () => {
+    try {
+      // Display a notification
+      await notifee.displayNotification({
+        title: 'Driver Assigned !',
+        body: 'You have been assigned a Driver!',
+        android: {
+          channelId: 'default', // Use the channel ID created globally
+          importance: AndroidImportance.HIGH,
+          pressAction: {
+            id: 'home', // Action ID matches our handler
+          },
+        },
+      });
+
+      // //console.log('Driver assiged notification sent.');
     } catch (error) {
       console.error('Error displaying notification:', error);
     }
@@ -1355,11 +1545,11 @@ const handleBookButtonPress = () => {
     { id: 6, latitude: 25.3201546, longitude: 83.0267088 }, // Nearby spot 1
     { id: 7, latitude: 25.3179901, longitude: 83.0236863 }, // Nearby spot 2
     { id: 8, latitude: 25.3189905, longitude: 83.0248377 }, // Nearby spot 3
-    { id: 8, latitude: 25.3187559, longitude: 83.0256279 }, // Nearby spot 3
+    { id: 9, latitude: 25.3187559, longitude: 83.0256279 }, // Nearby spot 3
   ];
-
   return (
     <View style={styles.container}>
+    
     {/* Map Background */}
     <MapView
   provider="google"
@@ -1373,7 +1563,7 @@ const handleBookButtonPress = () => {
   }}
 >
 {boatLocations.map((boat) => (
-  <Marker
+  <Marker key={boat.id}
     coordinate={{
       latitude: boat.latitude,
               longitude: boat.longitude,
@@ -1391,20 +1581,81 @@ const handleBookButtonPress = () => {
 
     {(loading ||mloading) && (
         <View style={styles.loadingOverlay}>
+                     <View style={styles.loadingCard}>
+
           <Icon name="boat" size={50} color="black" />
           {/* <Text>Searching Boat ...</Text> */}
           <ActivityIndicator size="large" color="black" style={{ marginTop: 20 }} />
         </View>
+        </View>
       )}
-      {showRideRequest && bookingType === 'now' && (
+      {showRideRequest && bookingType === 'now' && triprequestData?.getTripUser && (
         <RideRequestScreen
-          tripDetails={triprequestData?.getTripUser[0]}
+          tripDetails={triprequestData.getTripUser[0]}
           onClose={handleCloseRideRequest}
           tripRefetchdetails={tripRefetchdetails} // Pass the close callback
+          data ={data}
+
         />
       )}
 
+<ModalAlerts  isVisible={laterPayment}
+  onClose={() => setlaterPayment(false)}
+  title="Payment Successful !"
+  body ="You will be assigned a Driver shortly"/>
 
+<ModalAlerts  isVisible={modalpaymentdone}
+  onClose={() => setModalPayment(false)}
+  title="Payment Successful !"
+  body ="You have successfully completed the payment"/>
+
+<View style={styles.toastcontainer}>
+
+      <Toast
+        message="Your Trip has been accepted!"
+        visible={toastVisible}
+        onClose={() => setToastVisible(false)}
+      />
+
+<Toast
+        message="Driver assigned for your trip!"
+        visible={tripassigned}
+        onClose={() => setTripAssigned(false)}
+      />
+    </View>
+
+{/* <ModalAlerts  isVisible={modaldriverfound}
+  onClose={() => setModaldriverfound(false)}
+  title="Trip Accepted !"
+  body ="Your Trip has been accepted by the driver"/> */}
+
+{/* <ModalAlerts  isVisible={tripended}
+  onClose={() => setTripEnded(false)}
+  title="Trip Ended !"
+  body ="Your Trip has been ended"/> */}
+
+<Modal  animationType="fade"
+      transparent={true} visible={showNotFound}
+>
+          <View style={styles.notfoundoverlay}>
+          <View style={styles.modalCard}>
+          {/* Add your image */}
+          <Image
+            source={require('../assets/images/notfound.png')} // Replace with your image path
+            style={styles.image}
+          />
+          <Text style={styles.modalTitle}>Oops! Boat Driver Not Found</Text>
+          <Text style={styles.modalSubtitle}>
+            It seems we couldn't find a boat driver for your trip. Please try booking again.
+          </Text>
+          <TouchableOpacity style={styles.doneButton} onPress={onNotFound}>
+            <Text style={styles.doneButtonText}>Done</Text>
+          </TouchableOpacity>
+          {/* Retry button */}
+
+        </View>
+          </View>
+        </Modal>
 {/* {driverFound && (
         <View style={styles.driverFoundContainer}>
           <Text>Driver has been found!</Text>
@@ -1412,7 +1663,7 @@ const handleBookButtonPress = () => {
       )} */}
 
     {/* Collapsible Booking Card */}
-    <Animated.View style={[styles.bookingCard, { height: cardHeight }]}>
+    <Animated.View style={[styles.bookingCard, { height: !isBooking ? cardHeight : 600 }]}>
       {/* Overlay to toggle the card */}
 
       {/* Scrollable Content */}
@@ -1522,7 +1773,7 @@ const handleBookButtonPress = () => {
   >
     {filteredBoats?.map((boat,index) => (
        <TouchableOpacity
-       key={index}
+       key={boat.id}
        
        onPress={() => setSelectedBoat(boat)} // Save the selected boat
      >
@@ -1578,8 +1829,8 @@ const handleBookButtonPress = () => {
       <View style={styles.confirmation}>
         {driverFound ?
          <View style={styles.header}>
-         <Image source={{ uri: 'data:image/jpeg;base64,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' }} style={styles.driverImage} />
-         <View style={styles.driverInfo}>
+      <PersonIcon name="person-circle-sharp" size={50} color="#ccc" />
+      <View style={styles.driverInfo}>
            <Text style={styles.driverName}>{driverdetails?.getUserDetails[0]?.driverFirstName} {driverdetails?.getUserDetails[0]?.driverLastName}</Text>
            <Text style={styles.driverId}>Driver ID: 1234</Text>
          </View>
@@ -1593,7 +1844,7 @@ const handleBookButtonPress = () => {
       : (selectedPayementmethod === 'Full Payment' ? selectedBoat?.triptype_cross_with_margin_gst || tripDetails?.triptype_cross_with_margin_gst : selectedBoat?.triptype_cross_partial_gst || tripDetails?.triptype_cross_partial_gst)
       } 
       </Text>
-         <Text >Total fare</Text>
+         <Text style={{color:'#333'}}>Total fare</Text>
 
          <View style={styles.otpContainer}>
               <Text style={styles.otpText}>OTP - {tripdetails?.getPaymentTrip[0]?.otp}</Text>
@@ -1607,7 +1858,7 @@ const handleBookButtonPress = () => {
          <Text style={styles.tripHeader}> { bookingType === 'later' ? 'Trip Confirmed !' :' Trip Accepted !'} </Text>
        </View>
        <View>
-       <Text >Total fare</Text>
+       <Text style={{color:'#333'}} >Total fare</Text>
 
        <Text style={styles.fare}>₹{selectedTripType === "Full Trip"
       ? (selectedPayementmethod === 'Full Payment' ? selectedBoat?.triptype_full_with_margin_gst || tripDetails?.triptype_full_with_margin_gst : selectedBoat?.triptype_full_partial_gst || tripDetails?.triptype_full_partial_gst) 
@@ -1667,6 +1918,7 @@ const handleBookButtonPress = () => {
       } 
         </Text>
       </TouchableOpacity>
+      
 
       {/* Breakdown Section */}
       {showGST && (
@@ -1699,13 +1951,25 @@ const handleBookButtonPress = () => {
       ? (selectedPayementmethod === 'Full Payment' ? selectedBoat?.triptype_half_with_margin_gst || tripDetails?.triptype_half_with_margin_gst : selectedBoat?.triptype_half_partial_gst || tripDetails?.triptype_half_partial_gst)
       : (selectedPayementmethod === 'Full Payment' ? selectedBoat?.triptype_cross_with_margin_gst || tripDetails?.triptype_cross_with_margin_gst : selectedBoat?.triptype_cross_partial_gst || tripDetails?.triptype_cross_partial_gst)
       } </Text>
+      
           </View>
         </View>
       )}
       
         
     </View>
+    {selectedPayementmethod !== 'Full Payment' &&
+      <View style={styles.banner}>
+<Icon name="information-circle" size={20} color="#F5A623" style={styles.icon} />
 
+<Text style={styles.bannerText}> Pay remaining
+₹{selectedTripType === "Full Trip"
+      ? selectedBoat?.triptype_full_with_margin_gst - selectedBoat?.triptype_full_partial_gst  || tripDetails?.triptype_full_with_margin_gst - tripDetails?.triptype_full_partial_gst
+      : selectedTripType === "Half Trip"
+      ? selectedBoat?.triptype_half_with_margin_gst -selectedBoat?.triptype_half_partial_gst || tripDetails?.triptype_half_with_margin_gst -tripDetails?.triptype_half_partial_gst
+      : selectedBoat?.triptype_cross_with_margin_gst -selectedBoat?.triptype_cross_partial_gst || tripDetails?.triptype_cross_with_margin_gst -tripDetails?.triptype_cross_partial_gst} while ending the trip</Text>
+</View>
+}
     </>
 }
       </View>
@@ -1747,6 +2011,11 @@ const handleBookButtonPress = () => {
 const styles = StyleSheet.create({
 container: {
   flex: 1,
+},
+toastcontainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
 },
 bookingCard: {
   position: 'absolute',
@@ -2017,6 +2286,20 @@ loadingOverlay: {
   alignItems: 'center',
   zIndex:1
 },
+loadingCard: {
+  backgroundColor: 'white', // Card background color
+  padding: 20, // Add padding for inner content
+  borderRadius: 15, // Rounded corners
+  alignItems: 'center', // Center content horizontally
+  justifyContent: 'center', // Center content vertically
+  shadowColor: '#000',
+  shadowOpacity: 0.2,
+  shadowOffset: { width: 0, height: 2 },
+  shadowRadius: 4,
+  elevation: 5, // Shadow for Android
+  width: 150, // Fixed width for square
+  height: 150,
+},
 driverFoundContainer: {
   padding: 20,
   backgroundColor: '#f0f0f0',
@@ -2039,7 +2322,7 @@ driverInfo: {
   marginLeft: 10,
 },
 driverName: {
-  fontSize: 16,
+  fontSize: 19,
   fontWeight: 'bold',
   color:'#333'
 },
@@ -2060,6 +2343,8 @@ bookingDetails: {
   padding: 15,
   borderRadius: 10,
   marginVertical: 10,
+  borderWidth: 1,
+  borderColor: '#ccc',
 },
 detailLabel: {
   fontSize: 15,
@@ -2195,5 +2480,71 @@ totalValue: {
   fontSize: 18,
   fontWeight: "bold",
   color: "#000",
+},
+banner: {
+  flexDirection: "row", // Align items horizontally
+  backgroundColor: "#FFF7E6", // Light orange background
+  padding: 10,
+  borderRadius: 8,
+  marginVertical: 10,
+},
+bannerText: {
+  color: "#F5A623", // Orange text color
+  fontSize: 14,
+  fontWeight: "500",
+  textAlign: "center",
+  paddingRight: 10,
+
+},
+notfoundoverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0, 0, 0, 0.5)", // Dim background
+  justifyContent: "center",
+  alignItems: "center",
+},
+modalCard: {
+  backgroundColor: "#fff",
+  borderRadius: 15,
+  padding: 20,
+  width: "90%",
+  alignItems: "center",
+},
+image: {
+  width: 100,
+  height: 100,
+  marginBottom: 20,
+  resizeMode: 'contain',
+  borderRadius:40
+},
+retryText: {
+  color: 'white',
+  fontSize: 16,
+  fontWeight: 'bold',
+},
+modalTitle: {
+  fontSize: 20,
+  fontWeight: "bold",
+  color: "#333",
+  marginBottom: 10,
+  textAlign: "center",
+},
+modalSubtitle: {
+  fontSize: 16,
+  color: "#666",
+  textAlign: "center",
+  marginBottom: 20,
+},
+doneButton: {
+  backgroundColor: "#007BFF", // Blue button
+  paddingVertical: 10,
+  paddingHorizontal: 20,
+  borderRadius: 8,
+  alignItems: "center",
+  width: "100%",
+},
+doneButtonText: {
+  color: "#fff",
+  fontSize: 16,
+  fontWeight: "bold",
 },
 });
